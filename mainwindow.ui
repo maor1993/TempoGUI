@@ -229,14 +229,20 @@ QCheckBox::indicator {
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="UpdatePushButton">
+      <widget class="QPushButton" name="RecordingPushButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <property name="text">
         <string>Recordings</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="RecordingPushButton">
+      <widget class="QPushButton" name="UpdatePushButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <property name="text">
         <string>Update</string>
        </property>

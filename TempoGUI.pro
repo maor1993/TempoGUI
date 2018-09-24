@@ -26,16 +26,23 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    usbdevicesform.cpp
+    usbdevicesform.cpp \
+    recordingsform.cpp \
+    recordsworker.cpp \
+    icdworker.cpp
 
 HEADERS += \
         mainwindow.h \
     tempostructs.h \
-    usbdevicesform.h
+    usbdevicesform.h \
+    recordingsform.h \
+    recordsworker.h \
+    icdworker.h
 
 FORMS += \
         mainwindow.ui \
-    usbdevicesform.ui
+    usbdevicesform.ui \
+    recordingsform.ui
 
 RESOURCES += \
     tempoicons.qrc

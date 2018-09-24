@@ -1,3 +1,4 @@
+
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QtCore>
@@ -7,20 +8,32 @@
 #include "tempoicd.h"
 #include "tempostructs.h"
 
-Ui::ParseIcdStateMachineType MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Premble_a_st;
-
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
     this->setFixedSize(QSize(383, 214));
+
+
+    //generate objects
+
     UsbDevicesDialog = new UsbDevicesForm(this);
+    RecordingsDialog = new Recordingsform(this);
+
+    icdTxWorker = new icdworker();
+    icdTxWorkerThread = new QThread(this);
+
+    icdRxWorker = new icdworker();
+    icdRxWorkerThread = new QThread(this);
+    ui->RecordingPushButton->setEnabled(true);
+
+
+
     serial = new QSerialPort();
     //connect the serial port.
-    connect(serial,SIGNAL(readyRead()),this,SLOT(ReceiveUsbMsg()));
 
-    MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Premble_a_st;
+
 }
 
 MainWindow::~MainWindow()
@@ -37,6 +50,7 @@ void MainWindow::on_ConnectPushButton_clicked()
         UsbDevicesDialog->exec();
     }
 
+
     //setup port settings.
     serial->setPortName(UsbDevicesDialog->PortToConnectInfo.portName());
     serial->setBaudRate(230400);
@@ -51,6 +65,26 @@ void MainWindow::on_ConnectPushButton_clicked()
         ui->DevConnectedCheckBox->setCheckable(true);
         ui->DevConnectedCheckBox->setChecked(true);
         ui->ConnectPushButton->setEnabled(false);
+        ui->UpdatePushButton->setEnabled(true);
+        ui->RecordingPushButton->setEnabled(true);
+
+        //setup the worker.
+        icdTxWorker->DoSetup(1,serial,*icdTxWorkerThread);
+        icdTxWorker->moveToThread(icdTxWorkerThread);
+
+        connect(icdTxWorker,SIGNAL(SendToTransmit(icd::icd_template*)),this,SLOT(IcdTx(icd::icd_template*)));
+
+        icdRxWorker->DoSetup(0,serial,*icdRxWorkerThread);
+        //icdRxWorkerThread->moveToThread(icdRxWorkerThread);
+        //connect the parser.
+        connect(icdRxWorker,SIGNAL(SendToParser(icd::icd_template*)),this,SLOT(IcdParse(icd::icd_template*)));
+
+
+
+
+
+        icdTxWorkerThread->start();
+        qDebug()<< "icd thread started.";
     }
     else
     {
@@ -67,109 +101,18 @@ void MainWindow::on_DevConnectedCheckBox_stateChanged(int arg1)
         serial->close();
         ui->DevConnectedCheckBox->setCheckable(false);
         ui->ConnectPushButton->setEnabled(true);
-    }
-}
-
-
-void MainWindow::ReceiveUsbMsg()
-{
-    //step 1: collect data from serial device.
-    char rxdata[512];
-    uint16_t nrxdata_size;
-    static uint16_t i=0;
-    static icd::icd_template icd_msg;
-
-
-
-
-    nrxdata_size = serial->read(rxdata,sizeof(rxdata));
-    //check if there is more than a header in the buffer.
-        for(uint16_t ii =0;ii<nrxdata_size;ii++)
-        {
-            switch(MainWindow::ParseIcdStateMachine)
-            {
-                case Ui::ParseIcdStateMachineType::Premble_a_st:
-                {
-
-                if(static_cast<uint8_t>(rxdata[ii]) ==0xa5)
-                {
-                    MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Premble_b_st;
-                }
-
-                break;
-                }
-            case Ui::ParseIcdStateMachineType::Premble_b_st:
-            {
-                if(static_cast<uint8_t>(rxdata[ii]) == 0xa5)
-                {
-                    MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Sequnce_st;
-                }
-                else
-                {
-                    MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Premble_a_st;
-                }
-            break;
-            }
-
-            case Ui::ParseIcdStateMachineType::Sequnce_st:
-            {
-                icd_msg.sHeader.nSequence = static_cast<uint8_t>(rxdata[ii]);
-                MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Request_st;
-            break;
-            }
-            case Ui::ParseIcdStateMachineType::Request_st:
-        {
-
-                icd_msg.sHeader.nReq = static_cast<uint8_t>(rxdata[ii]);
-                MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::MessageType_st;
-            break;
-        }
-            case Ui::ParseIcdStateMachineType::MessageType_st:
-        {
-
-                icd_msg.sHeader.nMsgtype = static_cast<uint8_t>(rxdata[ii]);
-                MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::MessageLen_st;
-            break;
-        }
-            case Ui::ParseIcdStateMachineType::MessageLen_st:
-        {
-
-                icd_msg.sHeader.nMsglen = static_cast<uint8_t>(rxdata[ii]);
-                ParseIcdStateMachine = Ui::ParseIcdStateMachineType::MessageCollect_st;
-            break;
-        }
-            case Ui::ParseIcdStateMachineType::MessageCollect_st:
-        {
-
-                if(i < icd_msg.sHeader.nMsglen)
-                {
-                    icd_msg.nMsgdata[i++] = static_cast<uint8_t>(rxdata[ii]);
-                }
-                else if(i > 255)
-                {
-                    i=0;
-                    MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Premble_a_st;
-
-                }
-                else
-                {
-                    i=0;
-                    ParseIcd(&icd_msg);
-                    MainWindow::ParseIcdStateMachine = Ui::ParseIcdStateMachineType::Premble_a_st;
-                }
-            break;
-        }
-
+        ui->UpdatePushButton->setEnabled(false);
+        ui->RecordingPushButton->setEnabled(false);
     }
 }
 
 
 
 
-}
 
 
-void MainWindow::ParseIcd(icd::icd_template* pMsg)
+
+void MainWindow::IcdParse(icd::icd_template* pMsg)
 {
     switch(pMsg->sHeader.nReq)
     {
@@ -180,13 +123,17 @@ void MainWindow::ParseIcd(icd::icd_template* pMsg)
             {
                 case(USB_MSG_TYPE_STATUS):
                     {
-                        //cast the message to right template.
-                        icd::icd_status_msg_type* msg = (icd::icd_status_msg_type*)(pMsg);
+                        //copy the new message.
+                        icd::icd_status_msg_type* msg = new icd::icd_status_msg_type();
+
+                        memcpy(static_cast<uint8_t*>(&(msg->sHeader.nPremble[0])),static_cast<uint8_t*>(&(pMsg->sHeader.nPremble[0])),sizeof(icd::icd_header)+pMsg->sHeader
+                               .nMsglen);
 
                         //update the screen with current temperture
                         ui->TempTextBox->setText(QString::number(((msg->nTemp)&0xff00)>>8));
                         ui->BatteryBar->setValue(msg->nBattPercent);
 
+                        delete msg;
                         break;
                     }
 
@@ -194,26 +141,97 @@ void MainWindow::ParseIcd(icd::icd_template* pMsg)
 
             }
 
+
+        break;
+        }
+    case(USB_REQ_MASTER_RECEIVE):
+    {
+        switch(pMsg->sHeader.nMsgtype)
+        {
+        case(USB_MSG_TYPE_REPORT_RECORDING):
+        {
+            if(RecordingsDialog->bStarted)
+            {
+                icd::flash_file_header_type* header;
+
+                header = (icd::flash_file_header_type*)(pMsg->nMsgdata+1);
+                RecordingsDialog->RecordsWorker->RecieveHeader(header,pMsg->nMsgdata[0]);
+            }
+
+        break;
+        }
+
+
+
+
+        }
+
+
         break;
     }
 
-
-
-
-
-
-
-
-
-
-
     }
 
 
 
 }
 
-void MainWindow::on_TempTextBox_textChanged()
+
+void MainWindow::on_UpdatePushButton_clicked()
 {
+    QMessageBox::StandardButton res;
+    res = QMessageBox::warning(this,"Update Device","Warning!, this will set your device to update mode\n And will not work until updated. are you Sure?",QMessageBox::Yes|QMessageBox::No);
+
+    if(res == QMessageBox::Yes)
+    {
+        IcdGenerateEmptyRequest(USB_MSG_TYPE_START_UPDATE);
+        //send update command to device.
+    }
+
 
 }
+
+
+void MainWindow::IcdGenerateEmptyRequest(uint8_t nMsgType)
+{
+    icd::icd_template msg;
+
+    msg.sHeader.nPremble[0] = ICD_PREMBLE&0xff;
+    msg.sHeader.nPremble[1] = (ICD_PREMBLE&0xff00)>>8;
+    msg.sHeader.nMsglen = 0;
+    msg.sHeader.nSequence = 0;
+    msg.sHeader.nReq = USB_REQ_MASTER_SEND;
+    msg.sHeader.nMsgtype = nMsgType;
+
+
+
+
+    icdTxWorker->addIcdMsgtoQueue(&msg);
+}
+
+
+void MainWindow::IcdTx(icd::icd_template* pMsg)
+{
+    char usbTxArray[USB_MAX_MSG_SIZE];
+
+    memcpy(&(usbTxArray[0]),static_cast<uint8_t*>(&(pMsg->sHeader.nPremble[0])),pMsg->sHeader.nMsglen+sizeof(icd::icd_header));
+    serial->write(usbTxArray,pMsg->sHeader.nMsglen + sizeof(icd::icd_header));
+}
+
+void MainWindow::on_RecordingPushButton_clicked()
+{
+    //checked if thread started
+    if(!RecordingsDialog->bStarted)
+    {
+        RecordingsDialog->start();
+
+        qDebug() << "started recording thread.";
+    }
+    else
+    {
+        RecordingsDialog->show();
+    }
+}
+
+
+
