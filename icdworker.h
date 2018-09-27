@@ -9,6 +9,8 @@ typedef enum
 {
     Premble_a_st,
     Premble_b_st,
+    Premble_c_st,
+    Premble_d_st,
     Sequnce_st,
     Request_st,
     MessageType_st,

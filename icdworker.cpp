@@ -59,10 +59,6 @@ void icdworker::DoWorkTX()
             msg = IcdTxQueue->dequeue();
 
             SendToTransmit(&msg);
-//            memcpy(&(usbTxArray[0]),static_cast<uint8_t*>(&(msg.sHeader.nPremble[0])),msg.sHeader.nMsglen+sizeof(icd::icd_header));
-
-
-//            serial->write(usbTxArray,msg.sHeader.nMsglen + sizeof(icd::icd_header));
         }
         QThread::msleep(100);
 
@@ -95,60 +91,95 @@ void icdworker::ReceiveUsbMsg()
         {
             switch(ParseIcdStateMachine)
             {
-                case ParseIcdStateMachineType::Premble_a_st:
+                case Premble_a_st:
                 {
 
-                if(static_cast<uint8_t>(rxdata[ii]) ==0xa5)
+                if(static_cast<uint8_t>(rxdata[ii]) ==0xdd)
                 {
-                    ParseIcdStateMachine = ParseIcdStateMachineType::Premble_b_st;
+                    ParseIcdStateMachine = Premble_b_st;
                     icd_msg.sHeader.nPremble[0] = static_cast<uint8_t>(rxdata[ii]);
 
                 }
 
                 break;
                 }
-            case ParseIcdStateMachineType::Premble_b_st:
+            case Premble_b_st:
             {
-                if(static_cast<uint8_t>(rxdata[ii]) == 0xa5)
+                if(static_cast<uint8_t>(rxdata[ii]) == 0xc0)
                 {
-                    ParseIcdStateMachine = ParseIcdStateMachineType::Sequnce_st;
+                    ParseIcdStateMachine = Premble_c_st;
                     icd_msg.sHeader.nPremble[1] = static_cast<uint8_t>(rxdata[ii]);
                 }
                 else
                 {
-                    ParseIcdStateMachine = ParseIcdStateMachineType::Premble_a_st;
+                    ParseIcdStateMachine = Premble_a_st;
                 }
             break;
             }
-
-            case ParseIcdStateMachineType::Sequnce_st:
+            case Premble_c_st:
             {
-                icd_msg.sHeader.nSequence = static_cast<uint8_t>(rxdata[ii]);
-                ParseIcdStateMachine = ParseIcdStateMachineType::Request_st;
+                if(static_cast<uint8_t>(rxdata[ii]) == 0x5b)
+                {
+                    ParseIcdStateMachine = Premble_d_st;
+                    icd_msg.sHeader.nPremble[2] = static_cast<uint8_t>(rxdata[ii]);
+                }
+                else
+                {
+                    ParseIcdStateMachine = Premble_a_st;
+                }
             break;
             }
-            case ParseIcdStateMachineType::Request_st:
-        {
+            case Premble_d_st:
+            {
+                if(static_cast<uint8_t>(rxdata[ii]) == 0x9a)
+                {
+                    ParseIcdStateMachine = Sequnce_st;
+                    icd_msg.sHeader.nPremble[3] = static_cast<uint8_t>(rxdata[ii]);
+                }
+                else
+                {
+                    ParseIcdStateMachine = Premble_a_st;
+                }
+
+
+
+
+            break;
+            }
+
+
+
+
+
+
+            case Sequnce_st:
+            {
+                icd_msg.sHeader.nSequence = static_cast<uint8_t>(rxdata[ii]);
+                ParseIcdStateMachine = Request_st;
+            break;
+            }
+            case Request_st:
+            {
 
                 icd_msg.sHeader.nReq = static_cast<uint8_t>(rxdata[ii]);
-                ParseIcdStateMachine = ParseIcdStateMachineType::MessageType_st;
+                ParseIcdStateMachine = MessageType_st;
             break;
-        }
-            case ParseIcdStateMachineType::MessageType_st:
+            }
+            case MessageType_st:
         {
 
                 icd_msg.sHeader.nMsgtype = static_cast<uint8_t>(rxdata[ii]);
-                ParseIcdStateMachine = ParseIcdStateMachineType::MessageLen_st;
+                ParseIcdStateMachine = MessageLen_st;
             break;
         }
-            case ParseIcdStateMachineType::MessageLen_st:
+            case MessageLen_st:
         {
 
                 icd_msg.sHeader.nMsglen = static_cast<uint8_t>(rxdata[ii]);
-                ParseIcdStateMachine = ParseIcdStateMachineType::MessageCollect_st;
+                ParseIcdStateMachine = MessageCollect_st;
             break;
         }
-            case ParseIcdStateMachineType::MessageCollect_st:
+            case MessageCollect_st:
         {
 
                 if(i < icd_msg.sHeader.nMsglen)
@@ -158,7 +189,7 @@ void icdworker::ReceiveUsbMsg()
                 else if(i > 255)
                 {
                     i=0;
-                    ParseIcdStateMachine = ParseIcdStateMachineType::Premble_a_st;
+                    ParseIcdStateMachine = Premble_a_st;
 
                 }
                 else
@@ -166,7 +197,7 @@ void icdworker::ReceiveUsbMsg()
                     i=0;
 
                     SendToParser(&icd_msg);
-                    ParseIcdStateMachine = ParseIcdStateMachineType::Premble_a_st;
+                    ParseIcdStateMachine = Premble_a_st;
                 }
             break;
         }

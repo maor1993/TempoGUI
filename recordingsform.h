@@ -22,15 +22,15 @@ public:
     void stop();
     QThread* RecordsWorkerThread;
     RecordsWorker* RecordsWorker;
-    void addHeaderToTable(icd::flash_file_header_type* pHeader);
 
 
+signals:
+    void icdPassRX(icd::flash_file_header_type* pMsg,uint8_t nTotalRecs);
 
 private slots:
     void on_Recordingsform_rejected();
-
-
-
+    void icdPassTX(icd::icd_req_recording_type* pMsg);
+    void addHeaderToTable(icd::flash_file_header_type* pHeader);
 private:
     Ui::Recordingsform *ui;
 

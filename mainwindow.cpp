@@ -72,7 +72,8 @@ void MainWindow::on_ConnectPushButton_clicked()
         icdTxWorker->DoSetup(1,serial,*icdTxWorkerThread);
         icdTxWorker->moveToThread(icdTxWorkerThread);
 
-        connect(icdTxWorker,SIGNAL(SendToTransmit(icd::icd_template*)),this,SLOT(IcdTx(icd::icd_template*)));
+        connect(icdTxWorker,SIGNAL(SendToTransmit(icd::icd_template*)),this,SLOT(IcdTx(icd::icd_template*))
+                );
 
         icdRxWorker->DoSetup(0,serial,*icdRxWorkerThread);
         //icdRxWorkerThread->moveToThread(icdRxWorkerThread);
@@ -152,10 +153,11 @@ void MainWindow::IcdParse(icd::icd_template* pMsg)
         {
             if(RecordingsDialog->bStarted)
             {
-                icd::flash_file_header_type* header;
+                icd::icd_get_recording_type* msg = new icd::icd_get_recording_type();
 
-                header = (icd::flash_file_header_type*)(pMsg->nMsgdata+1);
-                RecordingsDialog->RecordsWorker->RecieveHeader(header,pMsg->nMsgdata[0]);
+                memcpy(static_cast<uint8_t*>(&(msg->sHeader.nPremble[0])),static_cast<uint8_t*>(&(pMsg->sHeader.nPremble[0])),sizeof(icd::icd_header)+pMsg->sHeader.nMsglen);
+                qDebug() << "Received header!";
+                RecordingsDialog->RecordsWorker->ReceiveHeader(&(msg->sRecHeader),msg->nTotalRecs);
             }
 
         break;
@@ -169,6 +171,10 @@ void MainWindow::IcdParse(icd::icd_template* pMsg)
 
         break;
     }
+
+    default:
+        qDebug() << "request type is unkown!" << QString::number(pMsg->sHeader.nReq);
+        break;
 
     }
 
@@ -198,6 +204,8 @@ void MainWindow::IcdGenerateEmptyRequest(uint8_t nMsgType)
 
     msg.sHeader.nPremble[0] = ICD_PREMBLE&0xff;
     msg.sHeader.nPremble[1] = (ICD_PREMBLE&0xff00)>>8;
+    msg.sHeader.nPremble[2] = (ICD_PREMBLE&0xff0000)>>16;
+    msg.sHeader.nPremble[3] = (ICD_PREMBLE&0xff000000)>>24;
     msg.sHeader.nMsglen = 0;
     msg.sHeader.nSequence = 0;
     msg.sHeader.nReq = USB_REQ_MASTER_SEND;
@@ -225,7 +233,7 @@ void MainWindow::on_RecordingPushButton_clicked()
     {
         RecordingsDialog->start();
 
-        qDebug() << "started recording thread.";
+        qDebug() << "started recording form.";
     }
     else
     {
