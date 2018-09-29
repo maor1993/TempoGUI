@@ -37,7 +37,8 @@ HEADERS += \
     usbdevicesform.h \
     recordingsform.h \
     recordsworker.h \
-    icdworker.h
+    icdworker.h \
+    flashstrcuture.h
 
 FORMS += \
         mainwindow.ui \

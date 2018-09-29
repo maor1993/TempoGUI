@@ -17,6 +17,7 @@ namespace icd{
 #define USB_MSG_TYPE_GET_RECORDING			0x03
 #define USB_MSG_TYPE_START_UPDATE           0x04
 #define USB_MSG_TYPE_START_COMM             0x05
+#define USB_MSG_TYPE_REQUST_SAMPLES			0x06
 
 
 
@@ -74,9 +75,20 @@ typedef struct {
 typedef struct{
     icd_header sHeader;
     uint8_t nIdx;
-
-
 }icd_req_recording_type;
+
+
+typedef struct{
+    icd_header sHeader;
+    uint32_t nAddr;
+}icd_get_samples_type;
+
+typedef struct{
+    icd_header sHeader;
+    uint16_t nSamples[16];
+    uint32_t nRequestedSamples;
+}icd_requested_samples_type;
+
 
 
 const uint8_t timediffs[] = {1,5,10,30,60};

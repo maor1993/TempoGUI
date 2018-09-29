@@ -26,7 +26,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     icdRxWorker = new icdworker();
     icdRxWorkerThread = new QThread(this);
-    ui->RecordingPushButton->setEnabled(true);
 
 
 
@@ -137,9 +136,6 @@ void MainWindow::IcdParse(icd::icd_template* pMsg)
                         delete msg;
                         break;
                     }
-
-
-
             }
 
 
@@ -161,6 +157,21 @@ void MainWindow::IcdParse(icd::icd_template* pMsg)
             }
 
         break;
+        }
+        case(USB_MSG_TYPE_REQUST_SAMPLES):
+        {
+            if(RecordingsDialog->bStarted)
+            {
+                icd::icd_requested_samples_type* msg = new icd::icd_requested_samples_type();
+                memcpy(static_cast<uint8_t*>(&(msg->sHeader.nPremble[0])),static_cast<uint8_t*>(&(pMsg->sHeader.nPremble[0])),sizeof(icd::icd_header)+pMsg->sHeader.nMsglen);
+                qDebug()<<"Received Samples!";
+                RecordingsDialog->RecordsWorker->ReceiveSamples(msg);
+
+
+            }
+
+
+
         }
 
 

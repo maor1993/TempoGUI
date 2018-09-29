@@ -29,11 +29,16 @@ signals:
 
 private slots:
     void on_Recordingsform_rejected();
-    void icdPassTX(icd::icd_req_recording_type* pMsg);
+    void icdPassTX(icd::icd_template* pMsg);
     void addHeaderToTable(icd::flash_file_header_type* pHeader);
+    void on_DownSelButton_clicked();
+    void save_to_file(uint16_t* pSamples);
+    void finishfile();
 private:
     Ui::Recordingsform *ui;
 
+    QString filename;
+    QFile file;
     void buildTable();
 
 };
